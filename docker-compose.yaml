@@ -1,0 +1,51 @@
+version: '2'
+
+services:
+  postgresql:
+    image: docker.io/bitnami/postgresql:14
+    ports:
+      - '5432:5432'
+    volumes:
+      - 'postgresql_data:/bitnami/postgresql'
+      - './cardano-db-sync:/opt/shareslake/cardano-db-sync'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
+      - POSTGRESQL_USERNAME=postgres
+      - POSTGRESQL_PASSWORD=password
+      - POSTGRESQL_DATABASE=cexplorer
+
+
+  cardano-db-sync:
+    image: inputoutput/cardano-db-sync:12.0.2
+    environment:
+      - NETWORK=${NETWORK:-mainnet}
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - RESTORE_SNAPSHOT=${RESTORE_SNAPSHOT:-}
+      - RESTORE_RECREATE_DB=N
+    depends_on:
+      - postgresql
+    secrets:
+      - postgres_password
+      - postgres_user
+      - postgres_db
+    volumes:
+      - ./db-sync-data:/var/lib/cexplorer
+      - /opt/shareslake/node-ipc/node.sock:/node-ipc/node.socket
+    restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+secrets:
+  postgres_db:
+    file: ./config/secrets/postgres-db
+  postgres_password:
+    file: ./config/secrets/postgres-password
+  postgres_user:
+    file: ./config/secrets/postgres-user
+volumes:
+  postgresql_data:
+    driver: local
+
