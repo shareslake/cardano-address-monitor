@@ -1,0 +1,3 @@
+[submodule "shareslake-db-sync"]
+	path = shareslake-db-sync
+	url = https://github.com/shareslake/shareslake-db-sync.git
