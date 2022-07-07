@@ -30,7 +30,7 @@ BEGIN
 	(SELECT json from tx_metadata WHERE NEW.tx_id=tx_id),
 	NEW.value,
 	NEW.id
-    );
+    ) ON CONFLICT DO NOTHING;
   END IF;
   RETURN NEW;
 END;
