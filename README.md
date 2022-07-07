@@ -39,6 +39,14 @@ You will obtain duplicated events if:
 1.
 1.
 
+## Quick check of how it works using docker
+
+Run the following command (it assumes you have the Shareslake node running and `shareslake-db-sync` binary installed:
+
+```console
+./test/clean-restart.sh
+```
+
 # Configuring the network
 
 ## Shareslake mainnet
