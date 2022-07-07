@@ -20,7 +20,7 @@ PGPASSFILE=./pgpass-mainnet ./shareslake-db-sync/scripts/postgresql-setup.sh --c
 PGPASSFILE=./pgpass-mainnet cardano-db-sync --config ./mainnet-config.yaml --socket-path /opt/shareslake/node-ipc/node.sock --state-dir ./ledger-state/mainnet --schema-dir ./shareslake-db-sync/schema/ > ./db-sync.log 2>&1 &
 
 sleep 3
-PGPASSFILE=./pgpass-mainnet psql -Upostgres -h localhost -p 5432 --dbname cexplorer -a -f schema.sql
+PGPASSFILE=./pgpass-mainnet psql -Upostgres -h localhost -p 5432 --dbname cexplorer -f schema.sql
 
 fg
 

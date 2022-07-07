@@ -1,3 +1,4 @@
 ledger-state
 schema
 db-sync.log
+node_modules

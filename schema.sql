@@ -12,20 +12,24 @@ CREATE SCHEMA address_monitor; -- Create a new schema inside the the cexplorer d
 
 -- We can reference this table as cexplorer.address_monitor.address_tx_in or just address_monitor.address_tx_in when we are inside cexplorer database
 CREATE TABLE address_monitor.address_tx_in (
-	tx_id INT PRIMARY KEY, -- Corresponds to the "hash" in the "tx" table of "cexplorer" database
+	tx_id INT PRIMARY KEY, -- the transaction Id	
 	tx_hash VARCHAR(300) UNIQUE NOT NULL,
+	tx_out_id INT NOT NULL, -- the tx_out table id
 	immutability INT NOT NULL default 0,
-	tx_metadata VARCHAR(64) -- 64 bytes is the maximum size for Cardano metadata
+	tx_metadata VARCHAR(64), -- 64 bytes is the maximum size for Cardano metadata
+	tx_value BIGINT NOT NULL -- output in lovelace
 );
 
 -- add a new tx to the address_tx_in table
 CREATE OR REPLACE FUNCTION record_tx_received() RETURNS trigger as $$
 BEGIN
   IF (NEW.address = 'addr1q8u8yjqrk92f85fdhmv8de8xlusfay4vms6u2mar09sr7d7yhlettkjsqaqtkn8mnmaq6ng9nujzd5ng49m3t6ph2s5qqmvu4c') THEN -- TODO edit address or add as variable
-    INSERT INTO address_monitor.address_tx_in(tx_id,tx_hash,tx_metadata) VALUES (
+    INSERT INTO address_monitor.address_tx_in(tx_id,tx_hash,tx_metadata,tx_value,tx_out_id) VALUES (
 	NEW.tx_id,
         (SELECT hash from tx WHERE NEW.tx_id=id),
-	(SELECT json from tx_metadata WHERE NEW.tx_id=tx_id)
+	(SELECT json from tx_metadata WHERE NEW.tx_id=tx_id),
+	NEW.value,
+	NEW.id
     );
   END IF;
   RETURN NEW;
@@ -59,12 +63,21 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION notify_tx_immutable() RETURNS trigger as $$
+DECLARE
+  payload json;
 BEGIN
 -- send event to the channel called 'monitor'. A NodeJS process will listen events.
 -- If the immutability reaches the threshold specified.
   IF (NEW.immutability = 10) THEN -- TODO change the immutability to k, preferibly set it as parameter
     -- Use the 'address_monitor' channel to notify events
-    PERFORM pg_notify('address_monitor', '{ "hash": "' || NEW.tx_hash || '", "metadata": "' || NEW.tx_metadata || '" }');
+    payload := json_build_object(
+	'tx_hash', NEW.tx_hash,
+	'metadata', NEW.tx_metadata,
+	'value', NEW.tx_value,
+	'multi_asset', (SELECT json_agg(t) FROM (
+			SELECT quantity, policy, name FROM ma_tx_out INNER JOIN multi_asset ON multi_asset.id=ma_tx_out.ident AND tx_out_id=NEW.tx_out_id
+        ) AS t));
+    PERFORM pg_notify('address_monitor', payload::text);
   END IF;
   RETURN NEW;
 END;
