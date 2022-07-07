@@ -1,0 +1,4 @@
+{
+  "databaseURL": "postgresql://postgres:password@localhost:5432/cexplorer",
+  "channel": "address_monitor"
+}
