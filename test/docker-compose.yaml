@@ -14,7 +14,7 @@ services:
       - POSTGRESQL_PASSWORD=password
       - POSTGRESQL_DATABASE=cexplorer
 
-  cardano-db-sync:
+  shareslake-db-sync:
     image: shareslake/shareslake-db-sync:13.0.0
     environment:
       - PGPASSFILE=/pgpass-mainnet
@@ -32,6 +32,7 @@ services:
       - ${PWD}/test/shelley-genesis.json:/shelley-genesis.json
       - ${PWD}/test/alonzo-genesis.json:/alonzo-genesis.json
       - ${PWD}/test/tmp:/tmp
+      - ${PWD}/monitor-schema/schema.sql:/monitor-schema.sql
     command:
       - --config
       - /mainnet-config.yaml
@@ -48,9 +49,6 @@ services:
     volumes:
       - node-ipc:/opt/shareslake/node-ipc
       - node-db:/opt/shareslake/node-db
-
-
-      # TODO: container for the monitor
 
 volumes:
   postgresql_data:

@@ -1,76 +1,58 @@
 # Cardano Address Monitor
 
-Monitor one or more Cardano addresses and subscribe to events containing information about the received transactions.
-
-The Cardano Address Monitor ensures you won't process a transaction twice.
+Monitor one or more Cardano addresses for transactions and receive events with the transactions information. Designed to avoid processing a transaction twice.
 
 # How does it work?
 
-The monitor embeeds an schema into the cardano-db-sync's PostgreSQL database.
+When a transaction received by specified addresses is considered immutable the monitor sends an event into a PosgtreSQL channel. You can subscribe to the PostgreSQL channel to receive the events. The events contain information about the transactions received.
 
-The schema contains logic that monitor the transactions received by the specified addresses.
-
-Once the received transaction is considered immutable, the monitor will send an event into a PosgtreSQL channel.
 A transaction is immutable when there are `k` blocks added on top of the block containing the transaction. `k` is the Cardano security parameter.
-
 Since different applications can consider a different probability of being immutable, you can configure `k` for the monitor, i.e. you can configure how many blocks must be added on top of the block containing a transaction before the monitor sends the event. By default it is `2160`.
-
-# Avoid duplicated events
-
-The monitor won't send any duplicated event. Nevertheless, you may be carefull when restarting cardano-db-sync if you delete the `ledger-state` folder.
-
-You will obtain duplicated events if:
-
-* You delete the schema embeeded by the monitor (`address_monitor`) or the content of the tables.
-
-* You manually decrease the `immutability` colum of the table `address_monitor.address_tx_in`.
-
-> IMPORTANT: if your cardano-db-sync crashes for some reason and you need to deploy a new clean instance, be sure to backup the data under `address_monitor` schema so you can avoid duplicated events.
 
 # Installation
 
+The address monitor is installed just by deploying a PostgreSQL schema in the same database that cardano-db-sync uses.
+
 ## Installing into an already running cardano-db-sync instance
 
-1.
-1.
-
-# Installing both cardano-db-sync and Cardano Address Monitor
-
-1.
-1.
-
-## Quick check of how it works using docker
-
-Run the following command (it assumes you have the Shareslake node running and `shareslake-db-sync` binary installed:
-
 ```console
-./test/clean-restart.sh
+psql -U<user> -d<database> -h<host> -f ./monitor-schema/schema.sql
 ```
 
-# Configuring the network
+> The database name must be the database used by cardano-db-sync. It is usually called `cexplorer`.
 
-## Shareslake mainnet
+## Install a full stack with docker-compose
 
-## Cardano mainnet
+> Executing the restart script deletes the PostgreSQL volume
 
-## Cardano testnet
+```console
+./test/restart.sh
+```
 
-## Custom testnet
+The bove command will use `test/docker-compose.yaml` to deploy a Shareslake node, shareslake-db-sync, postgresql and install the monitor.
+You can edit the docker-compose images and substitute the configuration and genesis files under `test` to deploy a Cardano mainnet node instead.
 
-# Testing
+> NOTE: shareslake-db-sync is the same as cardano-db-sync but used to connect to the Shareslake network instead of Cardano mainnet.
 
-1. Run `clean-install.sh`
-1. Run `tail -f db-sync.sql` to see db-sync logs
-1. Run `cd listener && node index.js` to run the example listener.
+# Check installation
 
-When a transaction is sent to the monitored address, the example listener will show its content.
+Subscribe with the example NodeJS listener to watch events. You can take the file as a base to build your custom scripts:
+
+```console
+cd listener && node index.js
+```
+
+It will just listen events and log them.
+
+# Listening events
+
+You can listen events just by subscribing to the `address_monitor` channel in PostgreSQL.
+
+# Avoid duplicated events
+
+As far as you don't delete data from PostgreSQL, an even't should never be send twice.
 
 # TODO
 
+[ ] Support for multiple addresses.
 [ ] Support configuration of `k` and addresses from another table.
-[ ] Support Cardano and Shareslake networks.
-[ ] Remove hardcoded paths for Shareslake node.
-
-
-
-
