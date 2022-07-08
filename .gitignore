@@ -1,3 +1,4 @@
-ledger-state
 db-sync.log
 node_modules
+*.lstate
+migrate*.log

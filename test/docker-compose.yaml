@@ -14,38 +14,48 @@ services:
       - POSTGRESQL_PASSWORD=password
       - POSTGRESQL_DATABASE=cexplorer
 
-
   cardano-db-sync:
-    image: inputoutput/cardano-db-sync:12.0.2
+    image: shareslake/shareslake-db-sync:13.0.0
     environment:
-      - NETWORK=${NETWORK:-mainnet}
-      - POSTGRES_HOST=postgresql
-      - POSTGRES_PORT=5432
-      - RESTORE_SNAPSHOT=${RESTORE_SNAPSHOT:-}
-      - RESTORE_RECREATE_DB=N
+      - PGPASSFILE=/pgpass-mainnet
     depends_on:
       - postgresql
-    secrets:
-      - postgres_password
-      - postgres_user
-      - postgres_db
+      - shareslake-node
     volumes:
-      - ./db-sync-data:/var/lib/cexplorer
-      - /opt/shareslake/node-ipc/node.sock:/node-ipc/node.socket
+      - node-ipc:/node-ipc
+      - ${PWD}/test/pgpass-mainnet:/pgpass-mainnet
+      - ${PWD}/test/mainnet-config.yaml:/mainnet-config.yaml
+      - ${PWD}/test/ledger-state/mainnet:/ledger-state/mainnet
+      - ${PWD}/shareslake-db-sync/schema:/schema
+      - ${PWD}/test/configuration-mainnet.yaml:/configuration-mainnet.yaml
+      - ${PWD}/test/byron-genesis.json:/byron-genesis.json
+      - ${PWD}/test/shelley-genesis.json:/shelley-genesis.json
+      - ${PWD}/test/alonzo-genesis.json:/alonzo-genesis.json
+      - ${PWD}/test/tmp:/tmp
+    command:
+      - --config
+      - /mainnet-config.yaml
+      - --socket-path
+      - /node-ipc/node.sock 
+      - --state-dir 
+      - /ledger-state/mainnet
+      - --schema-dir
+      - /schema/
     restart: on-failure
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "200k"
-        max-file: "10"
-secrets:
-  postgres_db:
-    file: ./config/secrets/postgres-db
-  postgres_password:
-    file: ./config/secrets/postgres-password
-  postgres_user:
-    file: ./config/secrets/postgres-user
+
+  shareslake-node:
+    image: shareslake/shareslake-node:1.35.0
+    volumes:
+      - node-ipc:/opt/shareslake/node-ipc
+      - node-db:/opt/shareslake/node-db
+
+
+      # TODO: container for the monitor
+
 volumes:
   postgresql_data:
     driver: local
-
+  node-ipc:
+    driver: local
+  node-db:
+    driver: local
