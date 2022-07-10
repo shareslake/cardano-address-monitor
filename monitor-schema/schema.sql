@@ -10,6 +10,15 @@
 
 CREATE SCHEMA address_monitor; -- Create a new schema inside the the cexplorer database
 
+CREATE TABLE address_monitor.config (
+   id bool PRIMARY KEY DEFAULT TRUE,
+   address VARCHAR NOT NULL,
+   k INT NOT NULL,
+   CONSTRAINT onerow CHECK (id)
+);
+
+INSERT INTO address_monitor.config(address,k) VALUES (:'address', :'k');
+
 -- We can reference this table as cexplorer.address_monitor.address_tx_in or just address_monitor.address_tx_in when we are inside cexplorer database
 CREATE TABLE address_monitor.address_tx_in (
 	tx_id INT PRIMARY KEY, -- the transaction Id	
@@ -23,7 +32,7 @@ CREATE TABLE address_monitor.address_tx_in (
 -- add a new tx to the address_tx_in table
 CREATE OR REPLACE FUNCTION record_tx_received() RETURNS trigger as $$
 BEGIN
-  IF (NEW.address = 'addr1q8u8yjqrk92f85fdhmv8de8xlusfay4vms6u2mar09sr7d7yhlettkjsqaqtkn8mnmaq6ng9nujzd5ng49m3t6ph2s5qqmvu4c') THEN -- TODO edit address or add as variable
+  IF (NEW.address = (SELECT address FROM address_monitor.config)) THEN
     INSERT INTO address_monitor.address_tx_in(tx_id,tx_hash,tx_metadata,tx_value,tx_out_id) VALUES (
 	NEW.tx_id,
         (SELECT hash from tx WHERE NEW.tx_id=id),
@@ -68,7 +77,7 @@ DECLARE
 BEGIN
 -- send event to the channel called 'monitor'. A NodeJS process will listen events.
 -- If the immutability reaches the threshold specified.
-  IF (NEW.immutability = 10) THEN -- TODO change the immutability to k, preferibly set it as parameter
+  IF (NEW.immutability = (SELECT k FROM address_monitor.config)) THEN
     -- Use the 'address_monitor' channel to notify events
     payload := json_build_object(
 	'tx_hash', NEW.tx_hash,
@@ -87,7 +96,7 @@ $$ LANGUAGE plpgsql;
 /* NOTE: the immutability is specified as the number of blocks over the block containing the Tx */
 CREATE OR REPLACE TRIGGER tx_immutable BEFORE UPDATE ON address_monitor.address_tx_in
     FOR EACH ROW
-    EXECUTE PROCEDURE notify_tx_immutable();
+    EXECUTE PROCEDURE notify_tx_immutable(:'k');
 
 /* Trigger to increase the immutability of a received Tx with each new block */
 CREATE OR REPLACE TRIGGER new_block BEFORE INSERT ON block
