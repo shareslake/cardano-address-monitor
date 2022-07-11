@@ -16,14 +16,17 @@ The address monitor is installed just by deploying a PostgreSQL schema in the sa
 ## Installing into an already running cardano-db-sync instance
 
 ```console
-psql -U<user> -d<database> -h<host> -f ./monitor-schema/schema.sql
+psql -U<user> -d<database> -h<host> -f ./monitor-schema/schema.sql -v address='<address>' -v k=2160
 ```
 
 > The database name must be the database used by cardano-db-sync. It is usually called `cexplorer`.
 
+
 ## Install a full stack with docker-compose
 
 > Executing the restart script deletes the PostgreSQL volume
+
+You may need to change the ownership of `test/pgpass-mainnet` and `test/ledger-state/mainnet` to belong to user `1001`.
 
 ```console
 ./test/restart.sh
