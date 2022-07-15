@@ -1,12 +1,4 @@
-/*
- We relay on that the events occur in order. db-sync uses the state-dir (specified on startup command as argument) to handle the ledger state (the current block).
- If for any reason your db-sync instance loses the state-dir content you would need to empty the address_tx_in table in order to avoid wrong immutability in the transactions.
- It will be populated again after the start.
-*/
-
 -- Execute "\c cexplorer" before deploying this schema
-
--- TODO: parametrize k and the address to monitor. We can read them from a table allowing to modify them on the fly
 
 CREATE SCHEMA address_monitor; -- Create a new schema inside the the cexplorer database
 
