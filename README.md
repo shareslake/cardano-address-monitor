@@ -57,5 +57,4 @@ As far as you don't delete data from PostgreSQL, an even't should never be send 
 
 # TODO
 
-[ ] Support for multiple addresses.
-[ ] Support configuration of `k` and addresses from another table.
+[ ] Support for tracking multiple addresses.
