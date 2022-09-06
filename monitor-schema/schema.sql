@@ -1,12 +1,4 @@
-/*
- We relay on that the events occur in order. db-sync uses the state-dir (specified on startup command as argument) to handle the ledger state (the current block).
- If for any reason your db-sync instance loses the state-dir content you would need to empty the address_tx_in table in order to avoid wrong immutability in the transactions.
- It will be populated again after the start.
-*/
-
 -- Execute "\c cexplorer" before deploying this schema
-
--- TODO: parametrize k and the address to monitor. We can read them from a table allowing to modify them on the fly
 
 CREATE SCHEMA address_monitor; -- Create a new schema inside the the cexplorer database
 
@@ -17,15 +9,18 @@ CREATE TABLE address_monitor.config (
    CONSTRAINT onerow CHECK (id)
 );
 
-INSERT INTO address_monitor.config(address,k) VALUES (:'address', :'k');
+-- In the limit case in which there is a soft fork at the block number 'k' and
+-- the rollback leaves the table with immutability=k a notification could
+-- be duplicated. Adding 1 to 'k' we will never fall to the immutability=k again
+INSERT INTO address_monitor.config(address,k) VALUES (:'address', :'k'::INTEGER + 1);
 
 -- We can reference this table as cexplorer.address_monitor.address_tx_in or just address_monitor.address_tx_in when we are inside cexplorer database
 CREATE TABLE address_monitor.address_tx_in (
-	tx_id INT PRIMARY KEY, -- the transaction Id	
+	tx_id BIGINT PRIMARY KEY, -- the transaction Id
 	tx_hash VARCHAR(300) UNIQUE NOT NULL,
-	tx_out_id INT NOT NULL, -- the tx_out table id
+	tx_out_id BIGINT NOT NULL, -- the tx_out table id
 	immutability INT NOT NULL default 0,
-	tx_metadata VARCHAR(64), -- 64 bytes is the maximum size for Cardano metadata
+	tx_metadata VARCHAR, -- The maximum size for Cardano metadata is 64 bytes, but encoded
 	tx_value BIGINT NOT NULL -- output in lovelace
 );
 
@@ -42,6 +37,10 @@ BEGIN
     ) ON CONFLICT DO NOTHING;
   END IF;
   RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Prevent our schema to affect db-sync table updates if it fails
+  RAISE WARNING 'There was an error updating the address_monitor.address_tx_in table: %', sqlstate;
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -56,7 +55,7 @@ $$ LANGUAGE plpgsql;
 -- When a block is rolled back we decrease immutability of all Tx
 CREATE OR REPLACE FUNCTION decrease_tx_immutability() RETURNS trigger as $$
 BEGIN
-  -- Decrease immutability of all previous tx in one 
+  -- Decrease immutability of all previous tx in one
   UPDATE address_monitor.address_tx_in SET immutability = immutability - 1;
   RETURN OLD;
 END;
@@ -80,12 +79,12 @@ BEGIN
   IF (NEW.immutability = (SELECT k FROM address_monitor.config)) THEN
     -- Use the 'address_monitor' channel to notify events
     payload := json_build_object(
-	'tx_hash', NEW.tx_hash,
-	'metadata', NEW.tx_metadata,
-	'value', NEW.tx_value,
-	'multi_asset', (SELECT json_agg(t) FROM (
-			SELECT quantity, policy, name FROM ma_tx_out INNER JOIN multi_asset ON multi_asset.id=ma_tx_out.ident AND tx_out_id=NEW.tx_out_id
-        ) AS t));
+	  'tx_hash', NEW.tx_hash,
+	  'metadata', NEW.tx_metadata,
+	  'value', NEW.tx_value,
+	  'multi_asset', (SELECT json_agg(t) FROM (
+			SELECT quantity, policy, name FROM ma_tx_out INNER JOIN multi_asset ON multi_asset.id=ma_tx_out.ident AND tx_out_id=NEW.tx_out_id) AS t)
+    );
     PERFORM pg_notify('address_monitor', payload::text);
   END IF;
   RETURN NEW;
@@ -96,7 +95,7 @@ $$ LANGUAGE plpgsql;
 /* NOTE: the immutability is specified as the number of blocks over the block containing the Tx */
 CREATE OR REPLACE TRIGGER tx_immutable BEFORE UPDATE ON address_monitor.address_tx_in
     FOR EACH ROW
-    EXECUTE PROCEDURE notify_tx_immutable(:'k');
+    EXECUTE PROCEDURE notify_tx_immutable();
 
 /* Trigger to increase the immutability of a received Tx with each new block */
 CREATE OR REPLACE TRIGGER new_block BEFORE INSERT ON block
@@ -114,4 +113,4 @@ CREATE OR REPLACE TRIGGER tx_rollback BEFORE DELETE ON tx_out
 /* Trigger to record transactions received into the address to monitor */
 CREATE OR REPLACE TRIGGER tx_received BEFORE INSERT ON tx_out
     FOR EACH ROW
-    EXECUTE PROCEDURE record_tx_received(); 
+    EXECUTE PROCEDURE record_tx_received();
