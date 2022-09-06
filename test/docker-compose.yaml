@@ -46,6 +46,8 @@ services:
 
   shareslake-node:
     image: shareslake/shareslake-node:1.35.0
+    ports:
+      - '3001:3001'
     volumes:
       - node-ipc:/opt/shareslake/node-ipc
       - node-db:/opt/shareslake/node-db
